@@ -302,25 +302,15 @@ func TestAPI_HealthService_SingleTag(t *testing.T) {
 			TTL:    "15s",
 		},
 	}
-	if err := agent.ServiceRegister(reg); err != nil {
-		t.Fatalf("err: %v", err)
-	}
+	require.NoError(t, agent.ServiceRegister(reg))
 	defer agent.ServiceDeregister("foo1")
 
 	retry.Run(t, func(r *retry.R) {
 		services, meta, err := health.Service("foo", "bar", true, nil)
-		if err != nil {
-			r.Fatal(err)
-		}
-		if meta.LastIndex == 0 {
-			r.Fatalf("Bad: %v", meta)
-		}
-		if len(services) != 1 {
-			r.Fatalf("Bad: %v", services)
-		}
-		if services[0].Service.ID != "foo1" {
-			r.Fatalf("Bad: %v", services[0].Service.ID)
-		}
+		require.NoError(t, err)
+		require.NotEqual(t, meta.LastIndex, 0)
+		require.Len(t, services, 1)
+		require.Equal(t, services[0].Service.ID, "foo1")
 	})
 }
 
@@ -344,9 +334,7 @@ func TestAPI_HealthService_MultipleTags(t *testing.T) {
 			TTL:    "15s",
 		},
 	}
-	if err := agent.ServiceRegister(reg); err != nil {
-		t.Fatalf("err: %v", err)
-	}
+	require.NoError(t, agent.ServiceRegister(reg))
 	defer agent.ServiceDeregister("foo1")
 
 	reg2 := &AgentServiceRegistration{
@@ -358,42 +346,26 @@ func TestAPI_HealthService_MultipleTags(t *testing.T) {
 			TTL:    "15s",
 		},
 	}
-	if err := agent.ServiceRegister(reg2); err != nil {
-		t.Fatalf("err: %v", err)
-	}
+	require.NoError(t, agent.ServiceRegister(reg2))
 	defer agent.ServiceDeregister("foo2")
 
 	// Test searching with one tag (two results)
 	retry.Run(t, func(r *retry.R) {
 		services, meta, err := health.ServiceMultipleTags("foo", []string{"bar"}, true, nil)
-		if err != nil {
-			r.Fatal(err)
-		}
-		if meta.LastIndex == 0 {
-			r.Fatalf("Bad: %v", meta)
-		}
-		// Should be 2 services with the `bar` tag
-		if len(services) != 2 {
-			r.Fatalf("Bad: %v", services)
-		}
+
+		require.NoError(t, err)
+		require.NotEqual(t, meta.LastIndex, 0)
+		require.Len(t, services, 2)
 	})
 
 	// Test searching with two tags (one result)
 	retry.Run(t, func(r *retry.R) {
 		services, meta, err := health.ServiceMultipleTags("foo", []string{"bar", "v2"}, true, nil)
-		if err != nil {
-			r.Fatal(err)
-		}
-		if meta.LastIndex == 0 {
-			r.Fatalf("Bad: %v", meta)
-		}
-		// Should be exactly 1 service
-		if len(services) != 1 {
-			r.Fatalf("Bad: %v", services)
-		}
-		if services[0].Service.ID != "foo2" {
-			r.Fatalf("Bad datacenter: %v", services[0].Service.ID)
-		}
+
+		require.NoError(t, err)
+		require.NotEqual(t, meta.LastIndex, 0)
+		require.Len(t, services, 1)
+		require.Equal(t, services[0].Service.ID, "foo2")
 	})
 }
 
@@ -409,21 +381,11 @@ func TestAPI_HealthService_NodeMetaFilter(t *testing.T) {
 	retry.Run(t, func(r *retry.R) {
 		// consul service should always exist...
 		checks, meta, err := health.Service("consul", "", true, &QueryOptions{NodeMeta: meta})
-		if err != nil {
-			r.Fatal(err)
-		}
-		if meta.LastIndex == 0 {
-			r.Fatalf("bad: %v", meta)
-		}
-		if len(checks) == 0 {
-			r.Fatalf("Bad: %v", checks)
-		}
-		if _, ok := checks[0].Node.TaggedAddresses["wan"]; !ok {
-			r.Fatalf("Bad: %v", checks[0].Node)
-		}
-		if checks[0].Node.Datacenter != "dc1" {
-			r.Fatalf("Bad datacenter: %v", checks[0].Node)
-		}
+		require.NoError(t, err)
+		require.NotEqual(t, meta.LastIndex, 0)
+		require.NotEqual(t, len(checks), 0)
+		require.Equal(t, checks[0].Node.Datacenter, "dc1")
+		require.Contains(t, checks[0].Node.TaggedAddresses, "wan")
 	})
 }
 

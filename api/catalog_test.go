@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/consul/testutil"
 	"github.com/hashicorp/consul/testutil/retry"
 	"github.com/pascaldekloe/goe/verify"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAPI_CatalogDatacenters(t *testing.T) {
@@ -230,25 +231,15 @@ func TestAPI_CatalogService_SingleTag(t *testing.T) {
 		ID:   "foo1",
 		Tags: []string{"bar"},
 	}
-	if err := agent.ServiceRegister(reg); err != nil {
-		t.Fatalf("err: %v", err)
-	}
+	require.NoError(t, agent.ServiceRegister(reg))
 	defer agent.ServiceDeregister("foo1")
 
 	retry.Run(t, func(r *retry.R) {
 		services, meta, err := catalog.Service("foo", "bar", nil)
-		if err != nil {
-			r.Fatal(err)
-		}
-		if meta.LastIndex == 0 {
-			r.Fatalf("Bad: %v", meta)
-		}
-		if len(services) != 1 {
-			r.Fatalf("Bad: %v", services)
-		}
-		if services[0].ServiceID != "foo1" {
-			r.Fatalf("Bad: %v", services[0].ServiceID)
-		}
+		require.NoError(t, err)
+		require.NotEqual(t, meta.LastIndex, 0)
+		require.Len(t, services, 1)
+		require.Equal(t, services[0].ServiceID, "foo1")
 	})
 }
 
@@ -268,9 +259,7 @@ func TestAPI_CatalogService_MultipleTags(t *testing.T) {
 		ID:   "foo1",
 		Tags: []string{"bar"},
 	}
-	if err := agent.ServiceRegister(reg); err != nil {
-		t.Fatalf("err: %v", err)
-	}
+	require.NoError(t, agent.ServiceRegister(reg))
 	defer agent.ServiceDeregister("foo1")
 
 	reg2 := &AgentServiceRegistration{
@@ -278,42 +267,30 @@ func TestAPI_CatalogService_MultipleTags(t *testing.T) {
 		ID:   "foo2",
 		Tags: []string{"bar", "v2"},
 	}
-	if err := agent.ServiceRegister(reg2); err != nil {
-		t.Fatalf("err: %v", err)
-	}
+	require.NoError(t, agent.ServiceRegister(reg2))
 	defer agent.ServiceDeregister("foo2")
 
 	// Test searching with one tag (two results)
 	retry.Run(t, func(r *retry.R) {
 		services, meta, err := catalog.ServiceMultipleTags("foo", []string{"bar"}, nil)
-		if err != nil {
-			r.Fatal(err)
-		}
-		if meta.LastIndex == 0 {
-			r.Fatalf("Bad: %v", meta)
-		}
+
+		require.NoError(t, err)
+		require.NotEqual(t, meta.LastIndex, 0)
+
 		// Should be 2 services with the `bar` tag
-		if len(services) != 2 {
-			r.Fatalf("Bad: %v", services)
-		}
+		require.Len(t, services, 2)
 	})
 
 	// Test searching with two tags (one result)
 	retry.Run(t, func(r *retry.R) {
 		services, meta, err := catalog.ServiceMultipleTags("foo", []string{"bar", "v2"}, nil)
-		if err != nil {
-			r.Fatal(err)
-		}
-		if meta.LastIndex == 0 {
-			r.Fatalf("Bad: %v", meta)
-		}
-		// Should be exactly 1 service
-		if len(services) != 1 {
-			r.Fatalf("Bad: %v", services)
-		}
-		if services[0].ServiceID != "foo2" {
-			r.Fatalf("Bad: %v", services[0].ServiceID)
-		}
+
+		require.NoError(t, err)
+		require.NotEqual(t, meta.LastIndex, 0)
+
+		// Should be exactly 1 service, named "foo2"
+		require.Len(t, services, 1)
+		require.Equal(t, services[0].ServiceID, "foo2")
 	})
 }
 
