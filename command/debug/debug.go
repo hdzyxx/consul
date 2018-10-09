@@ -363,6 +363,10 @@ func (c *cmd) captureDynamic() error {
 			wg.Add(1)
 
 			go func() {
+				// We need to capture profiles and traces at the same time
+				// and block for both of them
+				var wgProf sync.WaitGroup
+
 				pprofOutputs := make(map[string][]byte, 0)
 
 				heap, err := c.client.Debug().Heap()
@@ -371,25 +375,43 @@ func (c *cmd) captureDynamic() error {
 				}
 				pprofOutputs["heap"] = heap
 
-				// Capture a profile with a minimum of 1s
-				// TODO should be min across the board
+				// Capture a profile/trace with a minimum of 1s
 				s := c.interval.Seconds()
 				if s < 1 {
 					s = 1
 				}
 
-				// This will block for the interval
-				prof, err := c.client.Debug().Profile(int(s))
-				if err != nil {
-					errCh <- err
-				}
-				pprofOutputs["profile"] = prof
+				go func() {
+					wgProf.Add(1)
+
+					prof, err := c.client.Debug().Profile(int(s))
+					if err != nil {
+						errCh <- err
+					}
+					pprofOutputs["profile"] = prof
+
+					wgProf.Done()
+				}()
+
+				go func() {
+					wgProf.Add(1)
+
+					trace, err := c.client.Debug().Trace(int(s))
+					if err != nil {
+						errCh <- err
+					}
+					pprofOutputs["trace"] = trace
+
+					wgProf.Done()
+				}()
 
 				gr, err := c.client.Debug().Goroutine()
 				if err != nil {
 					errCh <- err
 				}
 				pprofOutputs["goroutine"] = gr
+
+				wgProf.Wait()
 
 				// Write profiles to disk
 				for output, v := range pprofOutputs {
